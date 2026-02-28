@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LightGBM Regressor &mdash; ML Zoo</title>
+    <meta name="description" content="Interactive deep-dive into LightGBM Regression with leaf-wise boosting visualization.">
+
+    <style>
+        :root {
+            --bg-primary:#0d1117;--bg-secondary:#161b22;--bg-card:#1c2128;
+            --bg-card-hover:#272d36;--bg-input:#21262d;
+            --text-primary:#e6edf3;--text-secondary:#8b949e;--text-muted:#6e7681;
+            --text-link:#58a6ff;--border-default:#30363d;--border-muted:#21262d;
+            --radius-sm:6px;--radius-md:10px;--transition:.2s ease;
+        }
+        :root[data-theme="light"] {
+            --bg-primary:#ffffff;--bg-secondary:#f6f8fa;--bg-card:#ffffff;
+            --bg-card-hover:#f3f4f6;--bg-input:#f6f8fa;
+            --text-primary:#1f2328;--text-secondary:#656d76;--text-muted:#8b949e;
+            --text-link:#0969da;--border-default:#d0d7de;--border-muted:#d8dee4;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+             color:var(--text-primary);background:var(--bg-primary);-webkit-font-smoothing:antialiased;
+             line-height:1.6}
+    </style>
+    <link rel="stylesheet" href="../../css/model.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="model-page">
+        <nav class="model-nav">
+            <a href="../../../../" class="model-nav__back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Back to ML Zoo
+            </a>
+        </nav>
+
+        <section class="model-hero">
+            <h1 class="model-hero__title">LightGBM Regressor</h1>
+            <div class="model-hero__meta">
+                <span class="model-hero__badge" style="background:#7ee787;color:#0d1117">Regression</span>
+                <span class="model-hero__badge" style="background:rgba(126,231,135,.15);color:#7ee787">Tree</span>
+                <span class="model-hero__year">Est. 2017</span>
+            </div>
+            <p class="model-hero__desc">
+                Fast gradient boosting using histogram-based splits and leaf-wise tree growth.
+                Optimized for efficiency on large datasets with high cardinality features.
+            </p>
+        </section>
+
+        <div class="model-diagram">
+            <div class="model-diagram__controls">
+                <button class="model-diagram__btn" id="btn-toggle-residuals">Show Residuals</button>
+                <button class="model-diagram__btn" onclick="MLZoo.diagram.resetZoom()">Reset View</button>
+            </div>
+            <div id="diagram-container"></div>
+            <div id="diagram-stats" style="padding:8px 0 0;font-size:.78rem;color:var(--text-muted)"></div>
+        </div>
+
+        <div class="model-slider" id="slider-rounds">
+            <span class="model-slider__label">Boosting rounds:</span>
+            <input type="range" class="model-slider__input" min="1" max="5" step="1" value="3" id="round-input">
+            <span class="model-slider__value" id="round-value">3</span>
+        </div>
+
+        <div class="model-slider" id="slider-lr">
+            <span class="model-slider__label">Learning rate:</span>
+            <input type="range" class="model-slider__input" min="0.1" max="1.0" step="0.1" value="0.3" id="lr-input">
+            <span class="model-slider__value" id="lr-value">0.3</span>
+        </div>
+
+        <div class="model-tabs">
+            <button class="model-tab-btn model-tab-btn--active" data-tab="overview">Overview</button>
+            <button class="model-tab-btn" data-tab="howto">How It Works</button>
+            <button class="model-tab-btn" data-tab="math">Math</button>
+            <button class="model-tab-btn" data-tab="code">Code</button>
+            <button class="model-tab-btn" data-tab="references">References</button>
+        </div>
+
+        <div class="model-tab-content model-tab-content--active" id="tab-overview">
+            <div class="model-section">
+                <h2>Overview</h2>
+                <p>
+                    LightGBM (Light Gradient Boosting Machine) is Microsoft's high-performance gradient
+                    boosting framework. It uses two key innovations: <strong>histogram-based splitting</strong>
+                    (bins continuous features into discrete buckets for faster split finding) and
+                    <strong>leaf-wise tree growth</strong> (grows the leaf with the largest loss reduction
+                    rather than level-by-level). These make it significantly faster than traditional
+                    implementations while achieving comparable or better accuracy.
+                </p>
+
+                <h3>When to Use</h3>
+                <ul>
+                    <li>Large datasets where XGBoost is too slow</li>
+                    <li>High-cardinality categorical features</li>
+                    <li>You need fast training without sacrificing accuracy</li>
+                    <li>Tabular/structured data regression tasks</li>
+                </ul>
+
+                <div class="model-proscons">
+                    <div class="model-pros">
+                        <h4>Pros</h4>
+                        <ul>
+                            <li>Fastest gradient boosting implementation</li>
+                            <li>Memory-efficient histogram representation</li>
+                            <li>Native categorical feature support</li>
+                            <li>Handles large datasets with millions of rows</li>
+                            <li>GOSS reduces computation with minimal accuracy loss</li>
+                        </ul>
+                    </div>
+                    <div class="model-cons">
+                        <h4>Cons</h4>
+                        <ul>
+                            <li>Leaf-wise growth can overfit on small datasets</li>
+                            <li>More hyperparameters to tune than simpler models</li>
+                            <li>Less interpretable than a single tree</li>
+                            <li>Histogram binning loses some precision</li>
+                            <li>Sensitive to num_leaves parameter</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="model-tab-content" id="tab-howto">
+            <div class="model-section">
+                <h2>How It Works</h2>
+                <h3>Histogram-Based Splitting</h3>
+                <p>
+                    Instead of evaluating every unique value as a potential split point (as XGBoost does),
+                    LightGBM bins continuous features into a fixed number of discrete buckets (default 255).
+                    Split finding then operates on the histogram, reducing time complexity from O(n&middot;features)
+                    to O(bins&middot;features).
+                </p>
+                <h3>Leaf-Wise (Best-First) Growth</h3>
+                <p>
+                    Traditional gradient boosting grows trees level-by-level. LightGBM instead always
+                    splits the leaf with the highest loss reduction. This produces asymmetric trees
+                    that can be deeper on one side, capturing complex patterns with fewer total leaves.
+                </p>
+                <h3>GOSS &amp; EFB</h3>
+                <p>
+                    <strong>Gradient-based One-Side Sampling (GOSS):</strong> Keeps all samples with
+                    large gradients but randomly samples from those with small gradients, since
+                    small-gradient samples are already well-learned.
+                </p>
+                <p>
+                    <strong>Exclusive Feature Bundling (EFB):</strong> Bundles mutually exclusive
+                    sparse features together, reducing the effective number of features.
+                </p>
+            </div>
+        </div>
+
+        <div class="model-tab-content" id="tab-math">
+            <div class="model-section">
+                <h2>Key Equations</h2>
+                <div class="model-math">
+                    <div class="model-math__label">Gradient Boosting Objective</div>
+                    <p>$$\mathcal{L}^{(t)} = \sum_{i=1}^{n} l(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)) + \Omega(f_t)$$</p>
+                </div>
+                <div class="model-math">
+                    <div class="model-math__label">Histogram Split Gain</div>
+                    <p>$$\text{Gain} = \frac{1}{2}\left[\frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} - \frac{(G_L+G_R)^2}{H_L+H_R+\lambda}\right] - \gamma$$</p>
+                    <p>where $G$ and $H$ are sums of first and second order gradients in each bin.</p>
+                </div>
+                <div class="model-math">
+                    <div class="model-math__label">Leaf-Wise Growth Rule</div>
+                    <p>At each step, split the leaf $l^*$ where:
+                    $$l^* = \arg\max_{l \in \text{leaves}} \max_{j,t} \text{Gain}(l, j, t)$$</p>
+                </div>
+                <div class="model-math">
+                    <div class="model-math__label">Additive Model</div>
+                    <p>$$\hat{y}^{(T)} = \hat{y}^{(0)} + \eta \sum_{t=1}^{T} f_t(x)$$</p>
+                    <p>where $\eta$ is the learning rate (shrinkage) and $f_t$ is the tree at round $t$.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="model-tab-content" id="tab-code">
+            <div class="model-section">
+                <h2>LightGBM</h2>
+                <div class="model-code">
+                    <div class="model-code__label">Python</div>
+                    <pre><code>import lightgbm as lgb
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+model = lgb.LGBMRegressor(
+    n_estimators=100,
+    learning_rate=0.1,
+    num_leaves=31,
+    max_depth=-1,
+    min_child_samples=20,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    reg_alpha=0.1,
+    reg_lambda=0.1,
+    random_state=42,
+    n_jobs=-1
+)
+model.fit(X_train, y_train,
+          eval_set=[(X_test, y_test)],
+          callbacks=[lgb.early_stopping(10)])
+
+y_pred = model.predict(X_test)
+print(f"R-squared: {r2_score(y_test, y_pred):.4f}")
+print(f"RMSE:      {mean_squared_error(y_test, y_pred, squared=False):.4f}")</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="model-tab-content" id="tab-references">
+            <div class="model-section">
+                <h2>Key References</h2>
+                <ul>
+                    <li>Ke, G., et al. (2017). LightGBM: A Highly Efficient Gradient Boosting Decision Tree. <em>NeurIPS</em>.</li>
+                    <li>Friedman, J. H. (2001). Greedy Function Approximation: A Gradient Boosting Machine. <em>Annals of Statistics</em>.</li>
+                </ul>
+                <h3>Related Models</h3>
+                <div class="model-related">
+                    <a href="../xgb-reg/" class="model-related__link">XGBoost Regressor</a>
+                    <a href="../catboost-reg/" class="model-related__link">CatBoost Regressor</a>
+                    <a href="../rf-reg/" class="model-related__link">Random Forest Regressor</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="../../js/shared-diagram.js"></script>
+    <script>
+    (function () {
+        var t = localStorage.getItem('mlzoo_theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+
+        document.querySelectorAll('.model-tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.model-tab-btn').forEach(function (b) { b.classList.remove('model-tab-btn--active'); });
+                document.querySelectorAll('.model-tab-content').forEach(function (c) { c.classList.remove('model-tab-content--active'); });
+                btn.classList.add('model-tab-btn--active');
+                document.getElementById('tab-' + btn.getAttribute('data-tab')).classList.add('model-tab-content--active');
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(document.body, {
+                    delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }]
+                });
+            }
+        });
+
+        var data = window.MLZoo.modelData;
+        MLZoo.diagram.init('#diagram-container', data.config);
+        MLZoo.diagram.drawPoints(data.points);
+
+        var currentRounds = 3;
+        var currentLR = 0.3;
+        var showResiduals = false;
+
+        function render() {
+            var segments = data.computeCumulative(currentRounds, currentLR);
+            MLZoo.diagram.clear();
+            MLZoo.diagram.drawPoints(data.points);
+            MLZoo.diagram.drawStepFunction(segments);
+
+            if (showResiduals) {
+                var fn = data.makePredictFn(segments);
+                MLZoo.diagram.drawResiduals(data.points, fn);
+            }
+
+            var statsEl = document.getElementById('diagram-stats');
+            if (statsEl) {
+                statsEl.textContent = 'Rounds: ' + currentRounds + '  |  LR: ' + currentLR.toFixed(1) +
+                    '  |  Segments: ' + segments.length + '  |  n = ' + data.points.length;
+            }
+        }
+
+        render();
+
+        document.getElementById('round-input').addEventListener('input', function () {
+            currentRounds = parseInt(this.value);
+            document.getElementById('round-value').textContent = currentRounds;
+            render();
+        });
+
+        document.getElementById('lr-input').addEventListener('input', function () {
+            currentLR = parseFloat(this.value);
+            document.getElementById('lr-value').textContent = currentLR.toFixed(1);
+            render();
+        });
+
+        document.getElementById('btn-toggle-residuals').addEventListener('click', function () {
+            showResiduals = !showResiduals;
+            this.textContent = showResiduals ? 'Hide Residuals' : 'Show Residuals';
+            render();
+        });
+    })();
+    </script>
+</body>
+</html>

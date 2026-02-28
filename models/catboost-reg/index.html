@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CatBoost Regressor &mdash; ML Zoo</title>
+    <meta name="description" content="Interactive deep-dive into CatBoost Regression with symmetric tree and ordered boosting visualization.">
+    <style>
+        :root{--bg-primary:#0d1117;--bg-secondary:#161b22;--bg-card:#1c2128;--bg-card-hover:#272d36;--bg-input:#21262d;--text-primary:#e6edf3;--text-secondary:#8b949e;--text-muted:#6e7681;--text-link:#58a6ff;--border-default:#30363d;--border-muted:#21262d;--radius-sm:6px;--radius-md:10px;--transition:.2s ease}
+        :root[data-theme="light"]{--bg-primary:#ffffff;--bg-secondary:#f6f8fa;--bg-card:#ffffff;--bg-card-hover:#f3f4f6;--bg-input:#f6f8fa;--text-primary:#1f2328;--text-secondary:#656d76;--text-muted:#8b949e;--text-link:#0969da;--border-default:#d0d7de;--border-muted:#d8dee4}
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--text-primary);background:var(--bg-primary);-webkit-font-smoothing:antialiased;line-height:1.6}
+    </style>
+    <link rel="stylesheet" href="../../css/model.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="model-page">
+        <nav class="model-nav"><a href="../../../../" class="model-nav__back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back to ML Zoo</a></nav>
+        <section class="model-hero">
+            <h1 class="model-hero__title">CatBoost Regressor</h1>
+            <div class="model-hero__meta">
+                <span class="model-hero__badge" style="background:#7ee787;color:#0d1117">Regression</span>
+                <span class="model-hero__badge" style="background:rgba(126,231,135,.15);color:#7ee787">Tree</span>
+                <span class="model-hero__year">Est. 2018</span>
+            </div>
+            <p class="model-hero__desc">Gradient boosting with ordered target encoding for categorical features and symmetric (oblivious) tree structure for fast, regularized predictions.</p>
+        </section>
+        <div class="model-diagram">
+            <div class="model-diagram__controls">
+                <button class="model-diagram__btn" id="btn-toggle-residuals">Show Residuals</button>
+                <button class="model-diagram__btn" onclick="MLZoo.diagram.resetZoom()">Reset View</button>
+            </div>
+            <div id="diagram-container"></div>
+            <div id="diagram-stats" style="padding:8px 0 0;font-size:.78rem;color:var(--text-muted)"></div>
+        </div>
+        <div class="model-slider"><span class="model-slider__label">Boosting rounds:</span><input type="range" class="model-slider__input" min="1" max="5" step="1" value="3" id="round-input"><span class="model-slider__value" id="round-value">3</span></div>
+        <div class="model-tabs">
+            <button class="model-tab-btn model-tab-btn--active" data-tab="overview">Overview</button>
+            <button class="model-tab-btn" data-tab="howto">How It Works</button>
+            <button class="model-tab-btn" data-tab="math">Math</button>
+            <button class="model-tab-btn" data-tab="code">Code</button>
+            <button class="model-tab-btn" data-tab="references">References</button>
+        </div>
+        <div class="model-tab-content model-tab-content--active" id="tab-overview">
+            <div class="model-section">
+                <h2>Overview</h2>
+                <p>CatBoost (Categorical Boosting) is a gradient boosting library developed by Yandex. It introduces <strong>ordered boosting</strong> to reduce prediction shift (a form of target leakage) and <strong>symmetric (oblivious) decision trees</strong> that use the same split condition at each level, enabling extremely fast inference via bitwise operations.</p>
+                <h3>When to Use</h3>
+                <ul><li>Data has categorical features that are expensive to one-hot encode</li><li>You want strong out-of-the-box performance with minimal tuning</li><li>Fast inference is critical (production deployment)</li><li>You need GPU-accelerated training</li></ul>
+                <div class="model-proscons">
+                    <div class="model-pros"><h4>Pros</h4><ul><li>Native categorical feature handling</li><li>Ordered boosting reduces overfitting</li><li>Symmetric trees enable very fast inference</li><li>Works well out-of-the-box with default parameters</li><li>GPU training support</li></ul></div>
+                    <div class="model-cons"><h4>Cons</h4><ul><li>Training can be slower than LightGBM</li><li>Symmetric trees may underfit complex patterns</li><li>Large model files due to oblivious tree storage</li><li>Fewer community resources than XGBoost</li></ul></div>
+                </div>
+            </div>
+        </div>
+        <div class="model-tab-content" id="tab-howto">
+            <div class="model-section">
+                <h2>How It Works</h2>
+                <h3>Ordered Boosting</h3>
+                <p>Standard gradient boosting computes residuals using the model trained on the same data, which causes <em>prediction shift</em>. CatBoost uses a permutation-based ordered boosting approach: for each sample, the model is only trained on preceding samples in a random permutation, eliminating target leakage.</p>
+                <h3>Symmetric (Oblivious) Trees</h3>
+                <p>At each depth level, all nodes use the same split feature and threshold. This means a tree of depth $d$ has exactly $2^d$ leaves. The symmetric structure acts as implicit regularization and allows prediction via simple bit operations.</p>
+                <h3>Ordered Target Encoding</h3>
+                <p>For categorical features, CatBoost computes target statistics using only preceding samples in the random permutation, preventing target leakage that plagues naive target encoding.</p>
+            </div>
+        </div>
+        <div class="model-tab-content" id="tab-math">
+            <div class="model-section">
+                <h2>Key Equations</h2>
+                <div class="model-math"><div class="model-math__label">Ordered Target Statistic</div><p>$$\hat{x}_i^k = \frac{\sum_{j:\ \sigma(j)<\sigma(i)} [x_j^k = x_i^k] \cdot y_j + a \cdot P}{\sum_{j:\ \sigma(j)<\sigma(i)} [x_j^k = x_i^k] + a}$$</p><p>where $\sigma$ is the random permutation and $a, P$ are prior parameters.</p></div>
+                <div class="model-math"><div class="model-math__label">Symmetric Tree Split</div><p>At depth $d$, all $2^{d-1}$ nodes at level $d$ share the same split: $$(j_d, t_d) = \arg\max_{j,t} \sum_{\text{nodes at level } d} \text{Gain}(\text{node}, j, t)$$</p></div>
+                <div class="model-math"><div class="model-math__label">Prediction (Oblivious Tree)</div><p>$$f(x) = w_{\text{leaf}(x)}, \quad \text{leaf}(x) = \sum_{d=1}^{D} 2^{d-1} \cdot \mathbf{1}[x_{j_d} > t_d]$$</p></div>
+            </div>
+        </div>
+        <div class="model-tab-content" id="tab-code">
+            <div class="model-section">
+                <h2>CatBoost</h2>
+                <div class="model-code"><div class="model-code__label">Python</div>
+                    <pre><code>from catboost import CatBoostRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+
+model = CatBoostRegressor(
+    iterations=500,
+    learning_rate=0.1,
+    depth=6,
+    l2_leaf_reg=3.0,
+    cat_features=cat_cols,  # list of categorical column indices
+    verbose=50
+)
+model.fit(X_train, y_train, eval_set=(X_test, y_test), early_stopping_rounds=20)
+
+y_pred = model.predict(X_test)
+print(f"R-squared: {r2_score(y_test, y_pred):.4f}")
+print(f"RMSE:      {mean_squared_error(y_test, y_pred, squared=False):.4f}")</code></pre>
+                </div>
+            </div>
+        </div>
+        <div class="model-tab-content" id="tab-references">
+            <div class="model-section">
+                <h2>Key References</h2>
+                <ul><li>Prokhorenkova, L., et al. (2018). CatBoost: unbiased boosting with categorical features. <em>NeurIPS</em>.</li><li>Dorogush, A. V., Ershov, V. &amp; Gulin, A. (2018). CatBoost: gradient boosting with categorical features support.</li></ul>
+                <h3>Related Models</h3>
+                <div class="model-related"><a href="../xgb-reg/" class="model-related__link">XGBoost</a><a href="../lgbm-reg/" class="model-related__link">LightGBM</a><a href="../rf-reg/" class="model-related__link">Random Forest</a></div>
+            </div>
+        </div>
+    </div>
+    <script src="js/data.js"></script>
+    <script src="../../js/shared-diagram.js"></script>
+    <script>
+    (function () {
+        var t = localStorage.getItem('mlzoo_theme'); if (t) document.documentElement.setAttribute('data-theme', t);
+        document.querySelectorAll('.model-tab-btn').forEach(function (btn) { btn.addEventListener('click', function () { document.querySelectorAll('.model-tab-btn').forEach(function (b) { b.classList.remove('model-tab-btn--active'); }); document.querySelectorAll('.model-tab-content').forEach(function (c) { c.classList.remove('model-tab-content--active'); }); btn.classList.add('model-tab-btn--active'); document.getElementById('tab-' + btn.getAttribute('data-tab')).classList.add('model-tab-content--active'); }); });
+        document.addEventListener('DOMContentLoaded', function () { if (typeof renderMathInElement !== 'undefined') { renderMathInElement(document.body, { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }] }); } });
+        var data = window.MLZoo.modelData; MLZoo.diagram.init('#diagram-container', data.config); MLZoo.diagram.drawPoints(data.points);
+        var currentRounds = 3, showResiduals = false;
+        function render() { var segments = data.computeCumulative(currentRounds, 0.3); MLZoo.diagram.clear(); MLZoo.diagram.drawPoints(data.points); MLZoo.diagram.drawStepFunction(segments); if (showResiduals) { MLZoo.diagram.drawResiduals(data.points, data.makePredictFn(segments)); } document.getElementById('diagram-stats').textContent = 'Rounds: ' + currentRounds + '  |  Segments: ' + segments.length + '  |  n = ' + data.points.length; }
+        render();
+        document.getElementById('round-input').addEventListener('input', function () { currentRounds = parseInt(this.value); document.getElementById('round-value').textContent = currentRounds; render(); });
+        document.getElementById('btn-toggle-residuals').addEventListener('click', function () { showResiduals = !showResiduals; this.textContent = showResiduals ? 'Hide Residuals' : 'Show Residuals'; render(); });
+    })();
+    </script>
+</body>
+</html>

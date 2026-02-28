@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Forest Regressor — ML Zoo</title>
+    <meta name="description" content="Interactive deep-dive into Random Forest Regression with D3.js visualization.">
+
+    <style>
+        :root {
+            --bg-primary:#0d1117;--bg-secondary:#161b22;--bg-card:#1c2128;
+            --bg-card-hover:#272d36;--bg-input:#21262d;
+            --text-primary:#e6edf3;--text-secondary:#8b949e;--text-muted:#6e7681;
+            --text-link:#58a6ff;--border-default:#30363d;--border-muted:#21262d;
+            --radius-sm:6px;--radius-md:10px;--transition:.2s ease;
+        }
+        :root[data-theme="light"] {
+            --bg-primary:#ffffff;--bg-secondary:#f6f8fa;--bg-card:#ffffff;
+            --bg-card-hover:#f3f4f6;--bg-input:#f6f8fa;
+            --text-primary:#1f2328;--text-secondary:#656d76;--text-muted:#8b949e;
+            --text-link:#0969da;--border-default:#d0d7de;--border-muted:#d8dee4;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+             color:var(--text-primary);background:var(--bg-primary);-webkit-font-smoothing:antialiased;
+             line-height:1.6}
+    </style>
+    <link rel="stylesheet" href="../../css/model.css">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="model-page">
+
+        <nav class="model-nav">
+            <a href="../../../../" class="model-nav__back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Back to ML Zoo
+            </a>
+        </nav>
+
+        <section class="model-hero">
+            <h1 class="model-hero__title">Random Forest Regressor</h1>
+            <div class="model-hero__meta">
+                <span class="model-hero__badge" style="background:#7ee787;color:#0d1117">Regression</span>
+                <span class="model-hero__badge" style="background:rgba(126,231,135,.15);color:#7ee787">Tree</span>
+                <span class="model-hero__year">Est. 2001</span>
+            </div>
+            <p class="model-hero__desc">
+                Ensemble of decorrelated decision trees using bagging and random feature subsets, averaged for prediction.
+                Watch individual tree predictions (faded) smooth into a robust ensemble average (bold).
+            </p>
+        </section>
+
+        <div class="model-diagram">
+            <div class="model-diagram__controls">
+                <button class="model-diagram__btn" id="btn-toggle-residuals">Show Residuals</button>
+                <button class="model-diagram__btn" onclick="MLZoo.diagram.resetZoom()">Reset View</button>
+            </div>
+            <div id="diagram-container"></div>
+            <div id="diagram-stats" style="padding:8px 0 0;font-size:.78rem;color:var(--text-muted)"></div>
+        </div>
+
+        <div class="model-slider" id="slider-ntrees">
+            <span class="model-slider__label">n_estimators:</span>
+            <input type="range" class="model-slider__input" min="1" max="5" step="1" value="3">
+            <span class="model-slider__value">3</span>
+        </div>
+
+        <div class="model-tabs">
+            <button class="model-tab-btn model-tab-btn--active" data-tab="overview">Overview</button>
+            <button class="model-tab-btn" data-tab="howto">How It Works</button>
+            <button class="model-tab-btn" data-tab="math">Math</button>
+            <button class="model-tab-btn" data-tab="code">Code</button>
+            <button class="model-tab-btn" data-tab="references">References</button>
+        </div>
+
+        <!-- Tab: Overview -->
+        <div class="model-tab-content model-tab-content--active" id="tab-overview">
+            <div class="model-section">
+                <h2>Overview</h2>
+                <p>
+                    Random Forest combines many decision trees trained on different bootstrap samples
+                    of the data, each considering a random subset of features at every split. The final
+                    prediction is the average of all individual tree predictions. This reduces variance
+                    while maintaining the flexibility of tree-based models.
+                </p>
+
+                <h3>When to Use</h3>
+                <ul>
+                    <li>You need a strong out-of-the-box baseline with minimal tuning</li>
+                    <li>Feature importance ranking is needed</li>
+                    <li>The dataset has mixed feature types and nonlinear relationships</li>
+                    <li>Robustness to outliers and noise is important</li>
+                </ul>
+
+                <div class="model-proscons">
+                    <div class="model-pros">
+                        <h4>Pros</h4>
+                        <ul>
+                            <li>Excellent out-of-the-box performance</li>
+                            <li>Robust to overfitting compared to single trees</li>
+                            <li>Embarrassingly parallel &mdash; trees train independently</li>
+                            <li>Built-in feature importance via impurity decrease</li>
+                            <li>Works well with high-dimensional data</li>
+                        </ul>
+                    </div>
+                    <div class="model-cons">
+                        <h4>Cons</h4>
+                        <ul>
+                            <li>Less interpretable than a single tree</li>
+                            <li>Higher memory and compute cost</li>
+                            <li>Cannot extrapolate beyond training range</li>
+                            <li>May underperform gradient boosting on structured data</li>
+                            <li>Slow prediction for very large ensembles</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: How It Works -->
+        <div class="model-tab-content" id="tab-howto">
+            <div class="model-section">
+                <h2>How It Works</h2>
+                <p>The Random Forest algorithm for regression:</p>
+                <ol style="color:var(--text-secondary);padding-left:20px;margin-bottom:16px">
+                    <li style="margin-bottom:8px">
+                        <strong>Bootstrap:</strong> Draw $B$ random samples (with replacement) from the training set.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Build trees:</strong> For each bootstrap sample, grow a decision tree. At each node,
+                        randomly select $m$ features (typically $m \approx p/3$ for regression) and find the best split
+                        among those features only.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Aggregate:</strong> Average the predictions from all $B$ trees.
+                    </li>
+                </ol>
+                <p>
+                    The combination of bagging (bootstrap aggregating) and random feature subsets ensures
+                    that individual trees are decorrelated, which reduces the variance of the ensemble
+                    without substantially increasing bias.
+                </p>
+            </div>
+        </div>
+
+        <!-- Tab: Math -->
+        <div class="model-tab-content" id="tab-math">
+            <div class="model-section">
+                <h2>Key Equations</h2>
+
+                <div class="model-math">
+                    <div class="model-math__label">Ensemble Prediction</div>
+                    <p>$$\hat{f}_{RF}(x) = \frac{1}{B}\sum_{b=1}^{B} T_b(x)$$</p>
+                    <p>where $T_b(x)$ is the prediction of the $b$-th tree.</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Variance Reduction via Averaging</div>
+                    <p>$$\text{Var}\!\left(\frac{1}{B}\sum_{b=1}^{B}T_b\right) = \rho\sigma^2 + \frac{1-\rho}{B}\sigma^2$$</p>
+                    <p>where $\rho$ is the average pairwise correlation between trees and $\sigma^2$ is the variance of a single tree.
+                    Random feature subsets reduce $\rho$, lowering ensemble variance.</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Out-of-Bag (OOB) Error</div>
+                    <p>$$\text{OOB-MSE} = \frac{1}{n}\sum_{i=1}^{n}\left(y_i - \hat{f}_{OOB}(x_i)\right)^2$$</p>
+                    <p>where $\hat{f}_{OOB}(x_i)$ averages only trees for which $x_i$ was NOT in the bootstrap sample.</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Feature Importance (Mean Decrease in Impurity)</div>
+                    <p>$$\text{Imp}(j) = \frac{1}{B}\sum_{b=1}^{B}\sum_{t \in T_b} \Delta_t \cdot \mathbf{1}(\text{split on } j)$$</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Code -->
+        <div class="model-tab-content" id="tab-code">
+            <div class="model-section">
+                <h2>scikit-learn</h2>
+                <div class="model-code">
+                    <div class="model-code__label">Python</div>
+                    <pre><code>from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+# Fit model
+model = RandomForestRegressor(
+    n_estimators=100,
+    max_depth=None,
+    min_samples_split=5,
+    max_features='sqrt',
+    oob_score=True,
+    n_jobs=-1,
+    random_state=42
+)
+model.fit(X_train, y_train)
+
+# Predict
+y_pred = model.predict(X_test)
+
+# Evaluate
+print(f"R-squared:  {r2_score(y_test, y_pred):.4f}")
+print(f"RMSE:       {mean_squared_error(y_test, y_pred, squared=False):.4f}")
+print(f"OOB Score:  {model.oob_score_:.4f}")
+
+# Feature importance
+for name, imp in sorted(zip(feature_names, model.feature_importances_),
+                         key=lambda x: -x[1]):
+    print(f"  {name}: {imp:.4f}")</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: References -->
+        <div class="model-tab-content" id="tab-references">
+            <div class="model-section">
+                <h2>Key References</h2>
+                <ul>
+                    <li>Breiman, L. (2001). <em>Random Forests</em>. Machine Learning, 45(1), 5-32.</li>
+                    <li>Hastie, T., Tibshirani, R., Friedman, J. (2009). <em>The Elements of Statistical Learning</em>, Chapter 15.</li>
+                    <li>Louppe, G. (2014). <em>Understanding Random Forests</em>. PhD Thesis.</li>
+                </ul>
+
+                <h3>Related Models</h3>
+                <div class="model-related">
+                    <a href="../dt-reg/" class="model-related__link">Decision Tree Regressor</a>
+                    <a href="../et-reg/" class="model-related__link">Extra Trees Regressor</a>
+                    <a href="../xgb-reg/" class="model-related__link">XGBoost Regressor</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="../../js/shared-diagram.js"></script>
+
+    <script>
+    (function () {
+        var t = localStorage.getItem('mlzoo_theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+
+        document.querySelectorAll('.model-tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.model-tab-btn').forEach(function (b) { b.classList.remove('model-tab-btn--active'); });
+                document.querySelectorAll('.model-tab-content').forEach(function (c) { c.classList.remove('model-tab-content--active'); });
+                btn.classList.add('model-tab-btn--active');
+                var tab = document.getElementById('tab-' + btn.getAttribute('data-tab'));
+                if (tab) tab.classList.add('model-tab-content--active');
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(document.body, {
+                    delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }]
+                });
+            }
+        });
+
+        var data = window.MLZoo.modelData;
+        var D = MLZoo.diagram;
+        D.init('#diagram-container', data.config);
+        D.drawPoints(data.points);
+
+        var currentN = 3;
+        var showResiduals = false;
+        var TREE_COLORS = ['#8b5cf6', '#f97316', '#06b6d4', '#ec4899', '#84cc16'];
+
+        function render(n) {
+            currentN = n;
+            D.clear();
+            D.drawPoints(data.points);
+
+            /* Draw individual trees (faded) */
+            for (var i = 0; i < n; i++) {
+                D.drawStepFunction(data.treePredictions[i], {
+                    color: TREE_COLORS[i],
+                    strokeWidth: 1.2,
+                    opacity: 0.3,
+                    className: 'step-line-faded'
+                });
+            }
+
+            /* Draw ensemble average (bold) */
+            var ensemble = data.computeEnsemble(n);
+            D.drawStepFunction(ensemble, {
+                color: '#58a6ff',
+                strokeWidth: 3,
+                opacity: 0.95,
+                className: 'step-line-ensemble'
+            });
+
+            if (showResiduals) {
+                var fn = data.makePredictFn(ensemble);
+                D.drawResiduals(data.points, fn);
+            }
+
+            var statsEl = document.getElementById('diagram-stats');
+            if (statsEl) {
+                statsEl.textContent = 'Trees: ' + n +
+                    '  |  Faded = individual trees, Bold = ensemble average  |  n = ' + data.points.length;
+            }
+        }
+
+        render(3);
+
+        var slider = document.querySelector('#slider-ntrees .model-slider__input');
+        var sliderVal = document.querySelector('#slider-ntrees .model-slider__value');
+        slider.addEventListener('input', function () {
+            var v = parseInt(this.value);
+            sliderVal.textContent = v;
+            render(v);
+        });
+
+        document.getElementById('btn-toggle-residuals').addEventListener('click', function () {
+            showResiduals = !showResiduals;
+            this.textContent = showResiduals ? 'Hide Residuals' : 'Show Residuals';
+            render(currentN);
+        });
+    })();
+    </script>
+</body>
+</html>

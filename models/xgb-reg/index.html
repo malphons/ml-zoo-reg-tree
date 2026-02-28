@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XGBoost Regressor — ML Zoo</title>
+    <meta name="description" content="Interactive deep-dive into XGBoost Regression with D3.js visualization.">
+
+    <style>
+        :root {
+            --bg-primary:#0d1117;--bg-secondary:#161b22;--bg-card:#1c2128;
+            --bg-card-hover:#272d36;--bg-input:#21262d;
+            --text-primary:#e6edf3;--text-secondary:#8b949e;--text-muted:#6e7681;
+            --text-link:#58a6ff;--border-default:#30363d;--border-muted:#21262d;
+            --radius-sm:6px;--radius-md:10px;--transition:.2s ease;
+        }
+        :root[data-theme="light"] {
+            --bg-primary:#ffffff;--bg-secondary:#f6f8fa;--bg-card:#ffffff;
+            --bg-card-hover:#f3f4f6;--bg-input:#f6f8fa;
+            --text-primary:#1f2328;--text-secondary:#656d76;--text-muted:#8b949e;
+            --text-link:#0969da;--border-default:#d0d7de;--border-muted:#d8dee4;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+             color:var(--text-primary);background:var(--bg-primary);-webkit-font-smoothing:antialiased;
+             line-height:1.6}
+    </style>
+    <link rel="stylesheet" href="../../css/model.css">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="model-page">
+
+        <nav class="model-nav">
+            <a href="../../../../" class="model-nav__back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Back to ML Zoo
+            </a>
+        </nav>
+
+        <section class="model-hero">
+            <h1 class="model-hero__title">XGBoost Regressor</h1>
+            <div class="model-hero__meta">
+                <span class="model-hero__badge" style="background:#7ee787;color:#0d1117">Regression</span>
+                <span class="model-hero__badge" style="background:rgba(126,231,135,.15);color:#7ee787">Tree</span>
+                <span class="model-hero__year">Est. 2016</span>
+            </div>
+            <p class="model-hero__desc">
+                Gradient boosted trees with regularization, efficient second-order optimization, and built-in
+                handling of missing values. Slide through boosting rounds to see the prediction improve.
+            </p>
+        </section>
+
+        <div class="model-diagram">
+            <div class="model-diagram__controls">
+                <button class="model-diagram__btn" id="btn-toggle-residuals">Show Residuals</button>
+                <button class="model-diagram__btn" onclick="MLZoo.diagram.resetZoom()">Reset View</button>
+            </div>
+            <div id="diagram-container"></div>
+            <div id="diagram-stats" style="padding:8px 0 0;font-size:.78rem;color:var(--text-muted)"></div>
+        </div>
+
+        <div class="model-slider" id="slider-round">
+            <span class="model-slider__label">Boosting round:</span>
+            <input type="range" class="model-slider__input" min="1" max="5" step="1" value="1">
+            <span class="model-slider__value">1</span>
+        </div>
+
+        <div class="model-tabs">
+            <button class="model-tab-btn model-tab-btn--active" data-tab="overview">Overview</button>
+            <button class="model-tab-btn" data-tab="howto">How It Works</button>
+            <button class="model-tab-btn" data-tab="math">Math</button>
+            <button class="model-tab-btn" data-tab="code">Code</button>
+            <button class="model-tab-btn" data-tab="references">References</button>
+        </div>
+
+        <!-- Tab: Overview -->
+        <div class="model-tab-content model-tab-content--active" id="tab-overview">
+            <div class="model-section">
+                <h2>Overview</h2>
+                <p>
+                    XGBoost (eXtreme Gradient Boosting) is a highly optimized gradient boosting framework.
+                    It builds an ensemble of shallow trees sequentially, where each new tree corrects the
+                    residual errors of the current ensemble. Key innovations include second-order gradient
+                    approximation, built-in L1/L2 regularization on leaf weights, and efficient handling
+                    of sparse and missing data.
+                </p>
+
+                <h3>When to Use</h3>
+                <ul>
+                    <li>Structured/tabular data with mixed feature types</li>
+                    <li>Kaggle and ML competitions</li>
+                    <li>When you need state-of-the-art predictive performance</li>
+                    <li>Datasets with missing values</li>
+                </ul>
+
+                <div class="model-proscons">
+                    <div class="model-pros">
+                        <h4>Pros</h4>
+                        <ul>
+                            <li>State-of-the-art accuracy on tabular data</li>
+                            <li>Built-in regularization prevents overfitting</li>
+                            <li>Handles missing values natively</li>
+                            <li>Second-order optimization converges faster</li>
+                            <li>Supports custom loss functions</li>
+                        </ul>
+                    </div>
+                    <div class="model-cons">
+                        <h4>Cons</h4>
+                        <ul>
+                            <li>Many hyperparameters to tune</li>
+                            <li>Sequential training (harder to parallelize than RF)</li>
+                            <li>Can overfit with too many rounds</li>
+                            <li>Less interpretable than single trees</li>
+                            <li>Sensitive to noisy labels</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: How It Works -->
+        <div class="model-tab-content" id="tab-howto">
+            <div class="model-section">
+                <h2>How It Works</h2>
+                <ol style="color:var(--text-secondary);padding-left:20px;margin-bottom:16px">
+                    <li style="margin-bottom:8px">
+                        <strong>Initialize:</strong> Start with a constant prediction (e.g., the global mean).
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Compute gradients:</strong> For each sample, compute the first-order gradient $g_i$
+                        and second-order gradient (Hessian) $h_i$ of the loss with respect to the current prediction.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Fit a tree:</strong> Build a regression tree using a special split criterion based on
+                        $g_i$ and $h_i$, with regularization terms penalizing tree complexity.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Update:</strong> Add the new tree's predictions (scaled by learning rate) to the
+                        cumulative ensemble prediction.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Repeat</strong> for a fixed number of rounds or until convergence.
+                    </li>
+                </ol>
+                <p>
+                    The diagram above shows how the cumulative prediction (orange line) progressively
+                    fits the data as more boosting rounds are added. Each round corrects the residual
+                    errors left by previous rounds.
+                </p>
+            </div>
+        </div>
+
+        <!-- Tab: Math -->
+        <div class="model-tab-content" id="tab-math">
+            <div class="model-section">
+                <h2>Key Equations</h2>
+
+                <div class="model-math">
+                    <div class="model-math__label">Additive Model</div>
+                    <p>$$\hat{y}_i^{(t)} = \hat{y}_i^{(t-1)} + \eta \cdot f_t(x_i)$$</p>
+                    <p>where $\eta$ is the learning rate and $f_t$ is the $t$-th tree.</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Regularized Objective</div>
+                    <p>$$\mathcal{L}^{(t)} = \sum_{i=1}^n \ell\!\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \Omega(f_t)$$</p>
+                    <p>$$\Omega(f_t) = \gamma T + \frac{1}{2}\lambda \sum_{j=1}^T w_j^2$$</p>
+                    <p>where $T$ is the number of leaves, $w_j$ are leaf weights, $\gamma$ penalizes tree complexity,
+                    and $\lambda$ is L2 regularization.</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Second-Order Approximation</div>
+                    <p>$$\mathcal{L}^{(t)} \approx \sum_{i=1}^n \left[g_i f_t(x_i) + \frac{1}{2}h_i f_t(x_i)^2\right] + \Omega(f_t)$$</p>
+                    <p>where $g_i = \partial_{\hat{y}} \ell(y_i, \hat{y}_i^{(t-1)})$ and $h_i = \partial^2_{\hat{y}} \ell(y_i, \hat{y}_i^{(t-1)})$.</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Optimal Leaf Weight</div>
+                    <p>$$w_j^* = -\frac{\sum_{i \in I_j} g_i}{\sum_{i \in I_j} h_i + \lambda}$$</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Split Gain</div>
+                    <p>$$\text{Gain} = \frac{1}{2}\left[\frac{(\sum_{i \in I_L}g_i)^2}{\sum_{i \in I_L}h_i+\lambda} + \frac{(\sum_{i \in I_R}g_i)^2}{\sum_{i \in I_R}h_i+\lambda} - \frac{(\sum_{i \in I}g_i)^2}{\sum_{i \in I}h_i+\lambda}\right] - \gamma$$</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Code -->
+        <div class="model-tab-content" id="tab-code">
+            <div class="model-section">
+                <h2>xgboost</h2>
+                <div class="model-code">
+                    <div class="model-code__label">Python</div>
+                    <pre><code>import xgboost as xgb
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+# Fit model
+model = xgb.XGBRegressor(
+    n_estimators=200,
+    max_depth=4,
+    learning_rate=0.1,
+    reg_alpha=0.0,       # L1 regularization
+    reg_lambda=1.0,      # L2 regularization
+    subsample=0.8,
+    colsample_bytree=0.8,
+    tree_method='hist',  # fast histogram-based
+    random_state=42
+)
+model.fit(X_train, y_train,
+          eval_set=[(X_test, y_test)],
+          verbose=False)
+
+# Predict
+y_pred = model.predict(X_test)
+
+# Evaluate
+print(f"R-squared: {r2_score(y_test, y_pred):.4f}")
+print(f"RMSE:      {mean_squared_error(y_test, y_pred, squared=False):.4f}")
+
+# Feature importance
+xgb.plot_importance(model, importance_type='gain', max_num_features=10)</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: References -->
+        <div class="model-tab-content" id="tab-references">
+            <div class="model-section">
+                <h2>Key References</h2>
+                <ul>
+                    <li>Chen, T. & Guestrin, C. (2016). <em>XGBoost: A Scalable Tree Boosting System</em>. KDD.</li>
+                    <li>Friedman, J. (2001). <em>Greedy Function Approximation: A Gradient Boosting Machine</em>. Annals of Statistics.</li>
+                </ul>
+
+                <h3>Related Models</h3>
+                <div class="model-related">
+                    <a href="../lgbm-reg/" class="model-related__link">LightGBM Regressor</a>
+                    <a href="../catboost-reg/" class="model-related__link">CatBoost Regressor</a>
+                    <a href="../rf-reg/" class="model-related__link">Random Forest Regressor</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="../../js/shared-diagram.js"></script>
+
+    <script>
+    (function () {
+        var t = localStorage.getItem('mlzoo_theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+
+        document.querySelectorAll('.model-tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.model-tab-btn').forEach(function (b) { b.classList.remove('model-tab-btn--active'); });
+                document.querySelectorAll('.model-tab-content').forEach(function (c) { c.classList.remove('model-tab-content--active'); });
+                btn.classList.add('model-tab-btn--active');
+                var tab = document.getElementById('tab-' + btn.getAttribute('data-tab'));
+                if (tab) tab.classList.add('model-tab-content--active');
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(document.body, {
+                    delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }]
+                });
+            }
+        });
+
+        var data = window.MLZoo.modelData;
+        var D = MLZoo.diagram;
+        D.init('#diagram-container', data.config);
+        D.drawPoints(data.points);
+
+        var currentRound = 1;
+        var showResiduals = false;
+
+        function render(nRounds) {
+            currentRound = nRounds;
+            D.clear();
+            D.drawPoints(data.points);
+
+            /* Draw cumulative prediction */
+            var cumSegs = data.computeCumulative(nRounds);
+            D.drawStepFunction(cumSegs, { color: '#f0883e', strokeWidth: 2.5 });
+
+            if (showResiduals) {
+                var fn = data.makePredictFn(cumSegs);
+                D.drawResiduals(data.points, fn);
+            }
+
+            /* Compute MSE */
+            var fn = data.makePredictFn(cumSegs);
+            var mse = 0;
+            for (var i = 0; i < data.points.length; i++) {
+                var err = data.points[i].y - fn(data.points[i].x);
+                mse += err * err;
+            }
+            mse = mse / data.points.length;
+
+            var statsEl = document.getElementById('diagram-stats');
+            if (statsEl) {
+                statsEl.textContent = 'Round: ' + nRounds + '/5  |  lr=' + data.learningRate +
+                    '  |  MSE=' + mse.toFixed(3) + '  |  Init=' + data.globalMean;
+            }
+        }
+
+        render(1);
+
+        var slider = document.querySelector('#slider-round .model-slider__input');
+        var sliderVal = document.querySelector('#slider-round .model-slider__value');
+        slider.addEventListener('input', function () {
+            var v = parseInt(this.value);
+            sliderVal.textContent = v;
+            render(v);
+        });
+
+        document.getElementById('btn-toggle-residuals').addEventListener('click', function () {
+            showResiduals = !showResiduals;
+            this.textContent = showResiduals ? 'Hide Residuals' : 'Show Residuals';
+            render(currentRound);
+        });
+    })();
+    </script>
+</body>
+</html>

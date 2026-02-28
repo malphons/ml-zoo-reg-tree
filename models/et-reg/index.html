@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extra Trees Regressor — ML Zoo</title>
+    <meta name="description" content="Interactive deep-dive into Extra Trees Regression with D3.js visualization.">
+
+    <style>
+        :root {
+            --bg-primary:#0d1117;--bg-secondary:#161b22;--bg-card:#1c2128;
+            --bg-card-hover:#272d36;--bg-input:#21262d;
+            --text-primary:#e6edf3;--text-secondary:#8b949e;--text-muted:#6e7681;
+            --text-link:#58a6ff;--border-default:#30363d;--border-muted:#21262d;
+            --radius-sm:6px;--radius-md:10px;--transition:.2s ease;
+        }
+        :root[data-theme="light"] {
+            --bg-primary:#ffffff;--bg-secondary:#f6f8fa;--bg-card:#ffffff;
+            --bg-card-hover:#f3f4f6;--bg-input:#f6f8fa;
+            --text-primary:#1f2328;--text-secondary:#656d76;--text-muted:#8b949e;
+            --text-link:#0969da;--border-default:#d0d7de;--border-muted:#d8dee4;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+             color:var(--text-primary);background:var(--bg-primary);-webkit-font-smoothing:antialiased;
+             line-height:1.6}
+    </style>
+    <link rel="stylesheet" href="../../css/model.css">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="model-page">
+
+        <nav class="model-nav">
+            <a href="../../../../" class="model-nav__back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Back to ML Zoo
+            </a>
+        </nav>
+
+        <section class="model-hero">
+            <h1 class="model-hero__title">Extra Trees Regressor</h1>
+            <div class="model-hero__meta">
+                <span class="model-hero__badge" style="background:#7ee787;color:#0d1117">Regression</span>
+                <span class="model-hero__badge" style="background:rgba(126,231,135,.15);color:#7ee787">Tree</span>
+                <span class="model-hero__year">Est. 2006</span>
+            </div>
+            <p class="model-hero__desc">
+                Like Random Forest but with fully random split thresholds, reducing variance at the cost of slightly higher bias.
+                Toggle between random and optimized splits to see the difference.
+            </p>
+        </section>
+
+        <div class="model-diagram">
+            <div class="model-diagram__controls">
+                <button class="model-diagram__btn model-diagram__btn--active" id="btn-mode-random" style="border-color:#7ee787;color:#7ee787">Random Splits (ET)</button>
+                <button class="model-diagram__btn" id="btn-mode-best">Best Splits (RF)</button>
+                <button class="model-diagram__btn" id="btn-mode-ensemble">ET Ensemble (5)</button>
+                <button class="model-diagram__btn" onclick="MLZoo.diagram.resetZoom()">Reset View</button>
+            </div>
+            <div id="diagram-container"></div>
+            <div id="diagram-stats" style="padding:8px 0 0;font-size:.78rem;color:var(--text-muted)"></div>
+        </div>
+
+        <div class="model-tabs">
+            <button class="model-tab-btn model-tab-btn--active" data-tab="overview">Overview</button>
+            <button class="model-tab-btn" data-tab="howto">How It Works</button>
+            <button class="model-tab-btn" data-tab="math">Math</button>
+            <button class="model-tab-btn" data-tab="code">Code</button>
+            <button class="model-tab-btn" data-tab="references">References</button>
+        </div>
+
+        <!-- Tab: Overview -->
+        <div class="model-tab-content model-tab-content--active" id="tab-overview">
+            <div class="model-section">
+                <h2>Overview</h2>
+                <p>
+                    Extremely Randomized Trees (Extra Trees) pushes the randomization idea of Random Forest
+                    further. Instead of searching for the best split threshold at each node, it draws
+                    thresholds completely at random for each candidate feature, then picks the one that
+                    gives the best criterion value. This additional randomness further reduces variance
+                    and is computationally cheaper since no exhaustive threshold search is needed.
+                </p>
+
+                <h3>When to Use</h3>
+                <ul>
+                    <li>You want faster training than Random Forest</li>
+                    <li>The data is noisy and you want extra variance reduction</li>
+                    <li>High-dimensional feature spaces</li>
+                    <li>When slight bias increase is acceptable for lower variance</li>
+                </ul>
+
+                <div class="model-proscons">
+                    <div class="model-pros">
+                        <h4>Pros</h4>
+                        <ul>
+                            <li>Faster training than RF (no exhaustive split search)</li>
+                            <li>Lower variance than RF due to extra randomness</li>
+                            <li>Handles noisy data well</li>
+                            <li>Uses full training set (no bootstrap by default)</li>
+                            <li>Parallelizable like RF</li>
+                        </ul>
+                    </div>
+                    <div class="model-cons">
+                        <h4>Cons</h4>
+                        <ul>
+                            <li>Slightly higher bias than RF</li>
+                            <li>May need more trees to converge</li>
+                            <li>No OOB estimate (uses all data, no bootstrap)</li>
+                            <li>Harder to interpret individual trees</li>
+                            <li>Random splits can be suboptimal on small datasets</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: How It Works -->
+        <div class="model-tab-content" id="tab-howto">
+            <div class="model-section">
+                <h2>How It Works</h2>
+                <p>The key difference from Random Forest is in step 2:</p>
+                <ol style="color:var(--text-secondary);padding-left:20px;margin-bottom:16px">
+                    <li style="margin-bottom:8px">
+                        <strong>No bootstrap:</strong> By default, Extra Trees uses the entire training set for each tree
+                        (though bootstrap can be enabled).
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Random thresholds:</strong> At each node, select $K$ random features. For each feature,
+                        draw a single random threshold uniformly between the feature's min and max in that node.
+                        Pick the (feature, threshold) pair with the best criterion.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Aggregate:</strong> Average the predictions from all trees, just like RF.
+                    </li>
+                </ol>
+                <p>
+                    Click the buttons above to compare: <strong>Random Splits</strong> shows a single ET-style tree with
+                    randomly chosen thresholds, <strong>Best Splits</strong> shows the RF-style tree with optimized thresholds,
+                    and <strong>ET Ensemble</strong> shows 5 random-split trees averaged together.
+                </p>
+            </div>
+        </div>
+
+        <!-- Tab: Math -->
+        <div class="model-tab-content" id="tab-math">
+            <div class="model-section">
+                <h2>Key Equations</h2>
+
+                <div class="model-math">
+                    <div class="model-math__label">Random Threshold Selection</div>
+                    <p>For feature $j$ at node $t$, draw threshold:</p>
+                    <p>$$t_j \sim \text{Uniform}\!\left(\min_{x_i \in R_t} x_{ij},\; \max_{x_i \in R_t} x_{ij}\right)$$</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Split Selection</div>
+                    <p>Among $K$ random (feature, threshold) pairs, choose:</p>
+                    <p>$$(j^*, t^*) = \arg\max_{j \in S_K} \Delta(j, t_j)$$</p>
+                    <p>where $S_K$ is the random feature subset of size $K$.</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Ensemble Prediction</div>
+                    <p>$$\hat{f}_{ET}(x) = \frac{1}{B}\sum_{b=1}^{B}T_b(x)$$</p>
+                </div>
+
+                <div class="model-math">
+                    <div class="model-math__label">Bias-Variance Trade-off</div>
+                    <p>Compared to RF, Extra Trees has:</p>
+                    <p>$$\text{Bias}_{ET} \geq \text{Bias}_{RF}, \quad \text{Var}_{ET} \leq \text{Var}_{RF}$$</p>
+                    <p>The increased randomness reduces correlation between trees, lowering ensemble variance.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Code -->
+        <div class="model-tab-content" id="tab-code">
+            <div class="model-section">
+                <h2>scikit-learn</h2>
+                <div class="model-code">
+                    <div class="model-code__label">Python</div>
+                    <pre><code>from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+# Fit model
+model = ExtraTreesRegressor(
+    n_estimators=100,
+    max_depth=None,
+    min_samples_split=5,
+    max_features='sqrt',
+    bootstrap=False,   # default: use full dataset
+    n_jobs=-1,
+    random_state=42
+)
+model.fit(X_train, y_train)
+
+# Predict
+y_pred = model.predict(X_test)
+
+# Evaluate
+print(f"R-squared: {r2_score(y_test, y_pred):.4f}")
+print(f"RMSE:      {mean_squared_error(y_test, y_pred, squared=False):.4f}")
+
+# Feature importance
+for name, imp in sorted(zip(feature_names, model.feature_importances_),
+                         key=lambda x: -x[1]):
+    print(f"  {name}: {imp:.4f}")</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: References -->
+        <div class="model-tab-content" id="tab-references">
+            <div class="model-section">
+                <h2>Key References</h2>
+                <ul>
+                    <li>Geurts, P., Ernst, D., Wehenkel, L. (2006). <em>Extremely Randomized Trees</em>. Machine Learning, 63(1), 3-42.</li>
+                    <li>Hastie, T., Tibshirani, R., Friedman, J. (2009). <em>The Elements of Statistical Learning</em>.</li>
+                </ul>
+
+                <h3>Related Models</h3>
+                <div class="model-related">
+                    <a href="../rf-reg/" class="model-related__link">Random Forest Regressor</a>
+                    <a href="../dt-reg/" class="model-related__link">Decision Tree Regressor</a>
+                    <a href="../xgb-reg/" class="model-related__link">XGBoost Regressor</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="../../js/shared-diagram.js"></script>
+
+    <script>
+    (function () {
+        var t = localStorage.getItem('mlzoo_theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+
+        document.querySelectorAll('.model-tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.model-tab-btn').forEach(function (b) { b.classList.remove('model-tab-btn--active'); });
+                document.querySelectorAll('.model-tab-content').forEach(function (c) { c.classList.remove('model-tab-content--active'); });
+                btn.classList.add('model-tab-btn--active');
+                var tab = document.getElementById('tab-' + btn.getAttribute('data-tab'));
+                if (tab) tab.classList.add('model-tab-content--active');
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(document.body, {
+                    delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }]
+                });
+            }
+        });
+
+        var data = window.MLZoo.modelData;
+        var D = MLZoo.diagram;
+        D.init('#diagram-container', data.config);
+        D.drawPoints(data.points);
+
+        var mode = 'random';
+
+        function render() {
+            D.clear();
+            D.drawPoints(data.points);
+
+            /* Reset button styles */
+            document.getElementById('btn-mode-random').style.borderColor = '';
+            document.getElementById('btn-mode-random').style.color = '';
+            document.getElementById('btn-mode-best').style.borderColor = '';
+            document.getElementById('btn-mode-best').style.color = '';
+            document.getElementById('btn-mode-ensemble').style.borderColor = '';
+            document.getElementById('btn-mode-ensemble').style.color = '';
+
+            var statsEl = document.getElementById('diagram-stats');
+
+            if (mode === 'random') {
+                document.getElementById('btn-mode-random').style.borderColor = '#7ee787';
+                document.getElementById('btn-mode-random').style.color = '#7ee787';
+                D.drawSplits(data.randomSplits, { color: '#d29922' });
+                D.drawStepFunction(data.randomSegments, { color: '#f0883e', strokeWidth: 2.5 });
+                if (statsEl) statsEl.textContent = 'Mode: Random Splits (Extra Trees style)  |  Splits at random thresholds';
+            } else if (mode === 'best') {
+                document.getElementById('btn-mode-best').style.borderColor = '#58a6ff';
+                document.getElementById('btn-mode-best').style.color = '#58a6ff';
+                D.drawSplits(data.bestSplits, { color: '#58a6ff' });
+                D.drawStepFunction(data.bestSegments, { color: '#58a6ff', strokeWidth: 2.5 });
+                if (statsEl) statsEl.textContent = 'Mode: Best Splits (RF style)  |  Splits optimized for MSE reduction';
+            } else {
+                document.getElementById('btn-mode-ensemble').style.borderColor = '#7ee787';
+                document.getElementById('btn-mode-ensemble').style.color = '#7ee787';
+                var TREE_COLORS = ['#8b5cf6', '#f97316', '#06b6d4', '#ec4899', '#84cc16'];
+                for (var i = 0; i < 5; i++) {
+                    D.drawStepFunction(data.etTrees[i], {
+                        color: TREE_COLORS[i], strokeWidth: 1.2, opacity: 0.3, className: 'step-line-faded'
+                    });
+                }
+                var ensemble = data.computeEnsemble(5);
+                D.drawStepFunction(ensemble, {
+                    color: '#7ee787', strokeWidth: 3, opacity: 0.95, className: 'step-line-ensemble'
+                });
+                if (statsEl) statsEl.textContent = 'Mode: ET Ensemble (5 trees)  |  Faded = individual, Bold = average';
+            }
+        }
+
+        render();
+
+        document.getElementById('btn-mode-random').addEventListener('click', function () { mode = 'random'; render(); });
+        document.getElementById('btn-mode-best').addEventListener('click', function () { mode = 'best'; render(); });
+        document.getElementById('btn-mode-ensemble').addEventListener('click', function () { mode = 'ensemble'; render(); });
+    })();
+    </script>
+</body>
+</html>
